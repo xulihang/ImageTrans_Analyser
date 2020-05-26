@@ -72,10 +72,10 @@ Sub Button2_MouseClicked (EventData As MouseEvent)
 			cells.Initialize
 			cells.Put("dir",File.GetName(File.GetFileParent(File.Combine(dirPath,imgName))))
 			cells.Put("imgName",imgName)
-			statisticsToCell(cells,m)
+			statisticsToCell(cells,m,operations)
 			wirteToRow(cells,row,basicInfo)
-			Dim groundTruth As List=getBoxes(dirPath,projectName,imgName)
-			Dim detected As List=getBoxes(dirPath,projectName&".bak",imgName)
+			Dim groundTruth As List=getBoxes(dirPath,"ground_truth.itp",imgName)
+			Dim detected As List=getBoxes(dirPath,"detection.itp",imgName)
 			excludeLowProbability(groundTruth)
 			getAccuracy(groundTruth,detected,cells,False)
 			getRecall(groundTruth,detected,cells,False)
@@ -90,8 +90,56 @@ Sub Button2_MouseClicked (EventData As MouseEvent)
 			rowNumber=rowNumber+1
 		Next
 	Next
+	sum(sheet1)
 	wb.Save(File.DirApp,"out.xlsx")
 End Sub
+
+Sub sum(sheet1 As PoiSheet)
+	Dim row As PoiRow = sheet1.CreateRow(sheet1.Rows.Size)
+	For Each span As Int In Array As Int(0,13)
+		Dim hitsSum,detectedSum,groundTruthSum,nonTransSum,nonTransGroundSum,soundSum,soundGroundSum As Int
+		For Each row As PoiRow In sheet1.Rows
+			If row.RowNumber=0 Then
+				Continue
+			End If
+			If row.RowNumber=sheet1.Rows.Size-1 Then
+				Continue
+			End If
+			Dim hits,detected,groundTruth,nonTrans,nonTransGround,sound,soundGround As Int
+			hits=row.GetCell(6+span).Value
+			detected=row.GetCell(7+span).Value
+			groundTruth=row.GetCell(11+span).Value
+			nonTrans=row.GetCell(15+span).Value
+			nonTransGround=row.GetCell(16+span).Value
+			sound=row.GetCell(17+span).Value
+			soundGround=row.GetCell(18+span).Value
+			hitsSum=hitsSum+hits
+			detectedSum=detectedSum+detected
+			groundTruthSum=groundTruthSum+groundTruth
+			nonTransSum=nonTransSum+nonTrans
+			nonTransGroundSum=nonTransGroundSum+nonTransGround
+			soundSum=soundSum+sound
+			soundGroundSum=soundGroundSum+soundGround
+		Next
+		Dim precison,precisonWithoutSound,recall,recallWithoutSound As Double
+		precison = (hitsSum-nonTransSum)/(detectedSum-nonTransSum)
+		precisonWithoutSound = (hitsSum-nonTransSum-soundSum)/(detectedSum-nonTransSum-soundSum)
+		recall = (hitsSum-nonTransSum)/(groundTruthSum-nonTransGroundSum)
+		recallWithoutSound = (hitsSum-nonTransSum-soundSum)/(groundTruthSum-nonTransGroundSum-soundGroundSum)
+		row.CreateCellNumeric(6+span,hitsSum)
+		row.CreateCellNumeric(7+span,detectedSum)
+		row.CreateCellNumeric(8+span,precison)
+		row.CreateCellNumeric(9+span,precisonWithoutSound)
+		row.CreateCellNumeric(11+span,groundTruthSum)
+		row.CreateCellNumeric(12+span,recall)
+		row.CreateCellNumeric(13+span,recallWithoutSound)
+		row.CreateCellNumeric(15+span,nonTransSum)
+		row.CreateCellNumeric(16+span,nonTransGroundSum)
+		row.CreateCellNumeric(17+span,soundSum)
+		row.CreateCellNumeric(18+span,soundGroundSum)
+	Next
+End Sub
+
 
 Sub wirteToRow(cells As Map,row As PoiRow,order As List)
 	For Each key As String In order
@@ -124,14 +172,17 @@ Sub AddPercent(cells As Map)
 	cells.Put("soundRecall",soundRecall)
 End Sub
 
-Sub statisticsToCell(cells As Map,data As Map)
+Sub statisticsToCell(cells As Map,data As Map,operationsList As List)
 	Dim index As Int=2
-	For Each operationName As String In operations
+	Log(data)
+	For Each operationName As String In operationsList
+		Log(operationName)
 		Dim operationData As Map=data.Get(operationName)
 		Dim startTime,endTime As Long
 		startTime=operationData.Get("startTime")
 		endTime=operationData.Get("endTime")
 		Dim seconds As Double=(endTime - startTime)/1000
+		Log(seconds)
 		cells.Put(operationName.Replace(".json",""),seconds)
 		index=index+1
 		If index=4 Then
@@ -385,7 +436,7 @@ Sub importDir(dirPath As String,filesList As List)
 			importDir(File.Combine(dirPath,filename),filesList)
 		End If
 		Dim lowerCaseName As String=filename.ToLowerCase
-		If lowerCaseName.EndsWith(".itp") Then
+		If lowerCaseName="detection.itp" Then
 			Dim one As List
 			one.Initialize
 			one.Add(filename)
@@ -405,4 +456,46 @@ Sub Button3_MouseClicked (EventData As MouseEvent)
 			fx.Msgbox(MainForm,"已经备份过了，不进行操作。","")
 		End If
 	Next
+End Sub
+
+Sub Button4_MouseClicked (EventData As MouseEvent)
+	Dim rowNumber As Int=1
+	Dim wb As PoiWorkbook
+	wb.InitializeNew(True)
+	Dim sheet1 As PoiSheet=wb.AddSheet("Sheet1",0)
+	Dim head As PoiRow = sheet1.CreateRow(0)
+	Dim basicInfo As List
+	basicInfo.Initialize
+	basicInfo.AddAll(Array As String("dir","imgName","mask","textRemoval","width","height"))
+	Dim heads As List
+	heads.Initialize
+	heads.AddAll(basicInfo)
+	For i=0 To heads.Size-1
+		head.CreateCellString(i,heads.Get(i))
+	Next
+	For Each one As List In ListView1.Items
+		Dim data As Map
+		data.Initialize
+		Dim projectName As String=one.Get(0)
+		Dim dirPath As String=one.Get(1)
+		Dim operationsList As List
+		operationsList.Initialize
+		operationsList.Add("mask.json")
+		operationsList.Add("textRemoval.json")
+		For Each operation As String In operationsList
+			readJsonToMap(operation,dirPath,data)
+		Next
+		For Each imgName As String In NamesList("mask.json",dirPath)
+			Dim m As Map=data.Get(imgName)
+			Dim row As PoiRow = sheet1.CreateRow(rowNumber)
+			Dim cells As Map
+			cells.Initialize
+			cells.Put("dir",File.GetName(File.GetFileParent(File.Combine(dirPath,imgName))))
+			cells.Put("imgName",imgName)
+			statisticsToCell(cells,m,operationsList)
+			wirteToRow(cells,row,basicInfo)
+			rowNumber=rowNumber+1
+		Next
+	Next
+	wb.Save(File.DirApp,"out2.xlsx")
 End Sub

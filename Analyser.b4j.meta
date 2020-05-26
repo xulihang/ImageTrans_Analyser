@@ -4,6 +4,6 @@ ModuleBreakpoints0=
 ModuleBreakpoints1=
 ModuleClosedNodes0=1
 ModuleClosedNodes1=
-NavigationStack=Main,getRecall,287,6,Main,Process_Globals,9,0,Main,Button2_MouseClicked,66,6,Main,AddSpecialAreasNum,314,6,Main,AddPercent,102,6,Utils,Process_Globals,3,0,Utils,OverlappingPercent,54,6,Main,isHit,297,6
+NavigationStack=Visual Designer,main.bjl,-100,6,Main,Button3_MouseClicked,435,0,Main,Process_Globals,9,0,Main,importDir,422,0,Main,readJsonToMap,380,0,Main,sum,81,6,Main,Button2_MouseClicked,77,6,Main,statisticsToCell,173,6,Main,wirteToRow,128,0,Main,Button4_MouseClicked,453,6
 SelectedBuild=0
 VisibleModules=1
